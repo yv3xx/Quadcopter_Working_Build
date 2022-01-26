@@ -1,5 +1,4 @@
-#include <Arduino.h>
-#include <PulsePosition.h>
+#include "header.h"
 
 
 //#define DEBUG 
@@ -11,6 +10,7 @@ unsigned long slowLoopTiming=0;
 float ppm_channels[6];
 PulsePositionInput myInput;
 
+uint32_t start,stop;
 
 // deadband variables
 #define MIDRC (1500)
@@ -19,7 +19,7 @@ PulsePositionInput myInput;
 #define DEADBAND (35)
 #define DEADTOP (MIDRC + DEADBAND)
 #define DEADBOT (MIDRC - DEADBAND)
-
+MS5611 MS5611(0x77);
 
 void setup() {  
   Serial.begin(9600);
@@ -33,7 +33,27 @@ void setup() {
   while(!myInput.available()){
   }
   Serial.println(myInput.available());
-  // put your setup code here, to run once:
+
+  
+  if (MS5611.begin() == true)
+  {
+    Serial.println("MS5611 found.");
+  }
+  else
+  {
+    Serial.println("MS5611 not found. halt.");
+    while (1);
+  }
+
+  MS5611.setOversampling(OSR_ULTRA_HIGH);
+  start=micros();
+  int result = MS5611.read();
+  stop=micros();
+  if (result != MS5611_READ_OK)
+  {
+    Serial.print("Error in read: ");
+    Serial.println(result);
+  }
 }
 
 void loop() {
@@ -49,12 +69,28 @@ void loop() {
       ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
       if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
     }
-    slowLoopTiming= micros() -slowLoopTimingStart;
+    
+
+    start=micros();
+    int result = MS5611.read();
+    stop=micros();
+    if (result != MS5611_READ_OK)
+    {
+      Serial.print("Error in read: ");
+      Serial.println(result);
+    }
+    Serial.print("T:\t");
+    Serial.print(MS5611.getTemperature(), 2);
+    Serial.print("\tP:\t");
+    Serial.print(MS5611.getPressure(), 2);
+    Serial.print("\tt:\t");
+    Serial.print(stop-start);
+    Serial.println();
     #ifdef DEBUG 
       Serial.print("Channel 1: "+(String)ppm_channels[0]+"Channel 2: "+(String)ppm_channels[1]+"Channel 3:"+(String)ppm_channels[2]+"Channel 4:"+(String)ppm_channels[3]+"Loop Length:"+(String)slowLoopTiming);
       Serial.println();
     #endif
-
+    slowLoopTiming= micros() -slowLoopTimingStart;
   }
 }
 

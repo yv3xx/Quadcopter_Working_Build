@@ -10,7 +10,7 @@ unsigned long slowLoopTiming=0;
 float ppm_channels[6];
 PulsePositionInput myInput;
 
-uint32_t start,stop;
+uint32_t start,stop,start1,stop1;
 
 // deadband variables
 #define MIDRC (1500)
@@ -21,20 +21,58 @@ uint32_t start,stop;
 #define DEADBOT (MIDRC - DEADBAND)
 MS5611 MS5611(0x77);
 
-void setup() {  
-  Serial.begin(9600);
-  while(!Serial){
-  
-  } Serial.println("Poop Hi serial is done");
 
+
+void slowLoopTask(void* parameters){
+  while(1){
+  start=micros();
   
-  pinMode(LED_BUILTIN,OUTPUT);
-  myInput.begin(5);
-  while(!myInput.available()){
+  int result = MS5611.read();
+  if (result != MS5611_READ_OK)
+    {
+      Serial.print("Error in read: ");
+      Serial.println(result);
+    }
+  
+  stop=micros();
+  Serial.print("T:\t");
+  Serial.print(MS5611.getTemperature(), 2);
+  Serial.print("\tP:\t");
+  Serial.print(MS5611.getPressure(), 2);
+  Serial.print("\t Time:\t");
+  Serial.println((stop-start));
+  Serial.println();
+
+    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
-  Serial.println(myInput.available());
+}
 
+void fastLoopTask(void* parameters){
+  uint8_t i=0;
+  while(1){
+  start1=micros();
+  for(i=1;i<=4; i++){
+    ppm_channels[i-1]=myInput.read(i);
+    ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
+    if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
+  }
+  stop1=micros();
+  Serial.print("\tCh 1:\t");
+  Serial.print(ppm_channels[0]);
+  Serial.print("\tCh 2:\t");
+  Serial.print(ppm_channels[1]);
+  Serial.print("\tCh 3:\t");
+  Serial.print(ppm_channels[2]);
+  Serial.print("\tCh 4:\t");
+  Serial.print(ppm_channels[3]);
+  Serial.print("\t Time:\t");
+  Serial.println((stop1-start1));
+  Serial.println();
   
+  vTaskDelay(2 / portTICK_PERIOD_MS);
+  }
+}
+void setupTask(void* parameters){
   if (MS5611.begin() == true)
   {
     Serial.println("MS5611 found.");
@@ -45,52 +83,39 @@ void setup() {
     while (1);
   }
 
-  MS5611.setOversampling(OSR_ULTRA_HIGH);
-  start=micros();
+
+  
+  MS5611.setOversampling(OSR_STANDARD);
   int result = MS5611.read();
-  stop=micros();
   if (result != MS5611_READ_OK)
   {
     Serial.print("Error in read: ");
     Serial.println(result);
   }
+ 
+  vTaskDelete(NULL);
+}
+void setup() {  
+  Serial.begin(115200);
+
+  Serial.println("Poop Hi serial is done");
+
+  
+  myInput.begin(5);
+  while(!myInput.available()){
+  }
+  Serial.println(myInput.available());
+
+  xTaskCreate(setupTask, "Setup",1000,NULL,3,NULL);
+  xTaskCreate(slowLoopTask,"slowLoop",1000,NULL,1,NULL);
+  xTaskCreate(fastLoopTask,"fastLoop",1000,NULL,2,NULL);
+  vTaskStartScheduler();
+  vTaskDelete(NULL);
 }
 
 void loop() {
-  uint8_t i;
-  unsigned long slowLoopEnd =millis();
-  slowLoopLength=slowLoopEnd- slowLoopStart;
-  if((slowLoopLength)>SLOWLOOPTARGET){
-    slowLoopStart=slowLoopEnd;
-    long slowLoopTimingStart=micros();
-    ppm_channels[5]=myInput.read(8);
-    for(i=1;i<=4; i++){
-      ppm_channels[i-1]=myInput.read(i);
-      ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
-      if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
-    }
-    
-
-    start=micros();
-    int result = MS5611.read();
-    stop=micros();
-    if (result != MS5611_READ_OK)
-    {
-      Serial.print("Error in read: ");
-      Serial.println(result);
-    }
-    Serial.print("T:\t");
-    Serial.print(MS5611.getTemperature(), 2);
-    Serial.print("\tP:\t");
-    Serial.print(MS5611.getPressure(), 2);
-    Serial.print("\tt:\t");
-    Serial.print(stop-start);
-    Serial.println();
-    #ifdef DEBUG 
-      Serial.print("Channel 1: "+(String)ppm_channels[0]+"Channel 2: "+(String)ppm_channels[1]+"Channel 3:"+(String)ppm_channels[2]+"Channel 4:"+(String)ppm_channels[3]+"Loop Length:"+(String)slowLoopTiming);
-      Serial.println();
-    #endif
-    slowLoopTiming= micros() -slowLoopTimingStart;
-  }
+  // does nothing
+  vTaskDelete(NULL);
 }
+
 

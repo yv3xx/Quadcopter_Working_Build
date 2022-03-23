@@ -2,30 +2,12 @@
 
 
 //#define DEBUG 
-// slow loop variables
-#define SLOWLOOPTARGET (1000)
-unsigned long slowLoopLength;
-unsigned long slowLoopStart=0;
-unsigned long slowLoopTiming=0;
-float ppm_channels[6];
-PulsePositionInput myInput;
+
 
 uint32_t start,stop,start1,stop1;
 
-// deadband variables
-#define MIDRC (1500)
-#define MINRC (1000)
-#define MAXRC (2000)
-#define DEADBAND (35)
-#define DEADTOP (MIDRC + DEADBAND)
-#define DEADBOT (MIDRC - DEADBAND)
-
 // barometer +temp
 MS5611 MS5611(0x77);
-
-// mpu
-MPU9250 IMU(SPI,10);
-int status;
 
 // bluetooth
 #define HWSERIAL Serial1
@@ -36,24 +18,21 @@ static const char cmp2[4]="alt";
 static const char cmp3[4]="bat";
 static const char cmp4[4]="pid";
 
-// motors
-uint16_t motor[4];
-uint8_t PWM_PIN[4]= {20,21,22,23};
+// mpu
+MPU9250 IMU(SPI,10);
+int status;
 
-void writeMotors(){
-  for( uint8_t i=0; i<4;i++){
-    analogWrite(PWM_PIN[i],(motor[i]-1000)/4);
-  }
-}
+//ppm stuff
+float ppm_channels[6];
+PulsePositionInput myInput;
 
-void initMotors(){
-  for(uint8_t i=0; i<4; i++){
-    motor[i]=1000;
-    pinMode(PWM_PIN[i],OUTPUT);
-    analogWriteFrequency(PWM_PIN[i],38000);
-  }
-  writeMotors();
-}
+
+// fusion
+
+float pitch, roll, yaw;
+
+SF fusion;
+
 void slowLoopTask(void* parameters){
   while(1){
   start=micros();
@@ -64,7 +43,9 @@ void slowLoopTask(void* parameters){
       Serial.print("Error in read: ");
       Serial.println(result);
     }
-  
+  readIMU(IMU);
+  calcIMU(IMU,fusion,&roll,&pitch,&yaw);
+  printAtt(roll,pitch,yaw);
   stop=micros();
   #ifdef DEBUG
     Serial.print("T:\t");
@@ -81,15 +62,10 @@ void slowLoopTask(void* parameters){
 }
 
 void fastLoopTask(void* parameters){
-  uint8_t i=0;
   while(1){
   start1=micros();
-  for(i=1;i<=4; i++){
-    ppm_channels[i-1]=myInput.read(i);
-    ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
-    if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
-  }
-  IMU.readSensor();
+  readPPM(ppm_channels,myInput);
+  
   stop1=micros();
   #ifdef DEBUG
     Serial.print("\tCh 1:\t");
@@ -156,7 +132,6 @@ void setupTask(void* parameters){
     while(1) {}
   }
   Serial.println("IMU intialization successful");
- 
   vTaskDelete(NULL);
 }
 
@@ -206,15 +181,12 @@ void setup() {
   Serial.println("Poop Hi serial is done");
 
   
-  myInput.begin(5);
-  while(!myInput.available()){
-  }
-  Serial.println(myInput.available());
+  initPPM(myInput);
 
   xTaskCreate(setupTask, "Setup",1000,NULL,3,NULL);
   xTaskCreate(slowLoopTask,"slowLoop",1000,NULL,1,NULL);
   xTaskCreate(fastLoopTask,"fastLoop",1000,NULL,2,NULL);
-  xTaskCreate(btTask,"bluetooth",250,NULL,3,NULL);
+  xTaskCreate(btTask,"bluetooth",250,NULL,1,NULL);
   vTaskStartScheduler();
   vTaskDelete(NULL);
 }

@@ -22,6 +22,8 @@ void readPPM(float ppm_channels[6],PulsePositionInput myInput);
 // initialize ppm
 void initPPM(PulsePositionInput myInput);
 
-void readIMU(MPU9250 IMU);
-void calcIMU(MPU9250 IMU,SF fusion,float* roll, float* pitch, float* yaw);
+void readIMU();
+void calcIMU(float* roll, float* pitch, float* yaw);
 void printAtt(float roll, float pitch, float yaw);
+void calIMU();
+void initIMU();

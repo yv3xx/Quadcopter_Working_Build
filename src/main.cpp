@@ -19,7 +19,7 @@ static const char cmp3[4]="bat";
 static const char cmp4[4]="pid";
 
 // mpu
-MPU9250 IMU(SPI,10);
+
 int status;
 
 //ppm stuff
@@ -31,7 +31,6 @@ PulsePositionInput myInput;
 
 float pitch, roll, yaw;
 
-SF fusion;
 
 void slowLoopTask(void* parameters){
   while(1){
@@ -43,8 +42,8 @@ void slowLoopTask(void* parameters){
       Serial.print("Error in read: ");
       Serial.println(result);
     }
-  readIMU(IMU);
-  calcIMU(IMU,fusion,&roll,&pitch,&yaw);
+  readIMU();
+  calcIMU(&roll,&pitch,&yaw);
   printAtt(roll,pitch,yaw);
   stop=micros();
   #ifdef DEBUG
@@ -123,15 +122,7 @@ void setupTask(void* parameters){
     Serial.println(result);
   }
 
-  status = IMU.begin();
-  if (status < 0) {
-    Serial.println("IMU initialization unsuccessful");
-    Serial.println("Check IMU wiring or try cycling power");
-    Serial.print("Status: ");
-    Serial.println(status);
-    while(1) {}
-  }
-  Serial.println("IMU intialization successful");
+  initIMU();
   vTaskDelete(NULL);
 }
 

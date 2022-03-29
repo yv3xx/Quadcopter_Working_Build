@@ -31,6 +31,14 @@ PulsePositionInput myInput;
 
 float pitch, roll, yaw;
 
+// timer handle for roll pitch yaw settling
+TimerHandle_t settlingTimer;
+
+
+SemaphoreHandle_t mutex;
+
+void vTimerCallback(TimerHandle_t xTimer){
+}
 
 void slowLoopTask(void* parameters){
   while(1){
@@ -123,6 +131,17 @@ void setupTask(void* parameters){
   }
 
   initIMU();
+  xTimerStart(settlingTimer,0);
+  Serial.println("Starting Timer");
+  while(xTimerIsTimerActive(settlingTimer)!= pdFALSE){
+    readIMU();
+    calcIMU(&roll,&pitch,&yaw);
+    printAtt(roll,pitch,yaw);
+  }
+
+  Serial.println("Hopefully the values will be the same after this!");
+  xTimerDelete(settlingTimer,portMAX_DELAY);
+  Serial.println("HOPEFULLY THE VLAUES WILL BE THE SAME!!");
   vTaskDelete(NULL);
 }
 
@@ -173,7 +192,8 @@ void setup() {
 
   
   initPPM(myInput);
-
+  settlingTimer=xTimerCreate("fusionWindup",20000/portTICK_RATE_MS,0,settlingTimer,vTimerCallback);
+  mutex=xSemaphoreCreateMutex();
   xTaskCreate(setupTask, "Setup",1000,NULL,3,NULL);
   xTaskCreate(slowLoopTask,"slowLoop",1000,NULL,1,NULL);
   xTaskCreate(fastLoopTask,"fastLoop",1000,NULL,2,NULL);

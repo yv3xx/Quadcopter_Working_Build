@@ -136,7 +136,7 @@ void initIMU(){
     IMU.setMagCalX(14.89f,1.136f);
     IMU.setMagCalY(-11.466f,1.163f);
     IMU.setMagCalZ(-69.6f,.81f);
-
+    
     Serial.println("IMU intialization successful");
 
 }

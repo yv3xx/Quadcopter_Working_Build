@@ -40,7 +40,7 @@ void calcIMU(float* roll, float* pitch, float* yaw){
     temp = IMU.getTemperature_C();
 
     deltat = fusion.deltatUpdate();
-  //fusion.MahonyUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, deltat);  //mahony is suggested if there isn't the mag
+ // fusion.MahonyUpdate(gx, gy, gz, ax, ay, az, deltat);  //mahony is suggested if there isn't the mag
   fusion.MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, deltat);  //else use the magwick
 
   *roll = fusion.getRoll();

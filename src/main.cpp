@@ -50,9 +50,7 @@ void slowLoopTask(void* parameters){
       Serial.print("Error in read: ");
       Serial.println(result);
     }
-  readIMU();
-  calcIMU(&roll,&pitch,&yaw);
-  printAtt(roll,pitch,yaw);
+  
   stop=micros();
   #ifdef DEBUG
     Serial.print("T:\t");
@@ -72,6 +70,9 @@ void fastLoopTask(void* parameters){
   while(1){
   start1=micros();
   readPPM(ppm_channels,myInput);
+  readIMU();
+  calcIMU(&roll,&pitch,&yaw);
+ // printAtt(roll,pitch,yaw);
   
   stop1=micros();
   #ifdef DEBUG
@@ -186,13 +187,13 @@ void btTask(void* parameters){
 }
 void setup() {  
   Serial.begin(115200);
-  HWSERIAL.begin(9600);
+  HWSERIAL.begin(115200);
 
   Serial.println("Poop Hi serial is done");
 
   
   initPPM(myInput);
-  settlingTimer=xTimerCreate("fusionWindup",20000/portTICK_RATE_MS,0,settlingTimer,vTimerCallback);
+  settlingTimer=xTimerCreate("fusionWindup",23000/portTICK_RATE_MS,0,settlingTimer,vTimerCallback);
   mutex=xSemaphoreCreateMutex();
   xTaskCreate(setupTask, "Setup",1000,NULL,3,NULL);
   xTaskCreate(slowLoopTask,"slowLoop",1000,NULL,1,NULL);

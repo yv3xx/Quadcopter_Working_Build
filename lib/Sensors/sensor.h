@@ -1,6 +1,8 @@
 #include "MPU9250.h"
-#include <PulsePosition.h>
+#include "PPM.h"
 #include "SensorFusion.h"
+#include "Arduino.h"
+
 
 // deadband variables
 #define MIDRC (1500)
@@ -9,19 +11,16 @@
 #define DEADBAND (35)
 #define DEADTOP (MIDRC + DEADBAND)
 #define DEADBOT (MIDRC - DEADBAND)
-
-
-
-
+#define PPMPIN 3
 
 // read the ppm values and put them into our channels
 
-void readPPM(float ppm_channels[6],PulsePositionInput myInput);
+void readPPM();
 
 
 // initialize ppm
-void initPPM(PulsePositionInput myInput);
-
+void initPPM();
+void printPPM();
 void readIMU();
 void calcIMU(float* roll, float* pitch, float* yaw);
 void printAtt(float roll, float pitch, float yaw);

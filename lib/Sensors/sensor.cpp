@@ -8,21 +8,37 @@ SF fusion;
 
 MPU9250 IMU(SPI,10);
 
-void readPPM(float ppm_channels[6],PulsePositionInput myInput){
+//ppm stuff
+float ppm_channels[6];
+PPM myPPM;
+
+
+void readPPM(){
     uint8_t i=0;
     for(i=1;i<=4; i++){
-        ppm_channels[i-1]=myInput.read(i);
+        ppm_channels[i-1]=myPPM.dataRead(PPMPIN,i);
         ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
         if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
     }
 }
 
-void initPPM(PulsePositionInput myInput){
-    myInput.begin(5);
-    while(!myInput.available()){
+void initPPM(){
+    myPPM.PPMInput(FALLING,1,PPMPIN);
+    while(!myPPM.dataAvl(PPMPIN)){
     }
 }
 
+void printPPM(){
+    Serial.print("\tCh 1:\t");
+    Serial.print(ppm_channels[0]);
+    Serial.print("\tCh 2:\t");
+    Serial.print(ppm_channels[1]);
+    Serial.print("\tCh 3:\t");
+    Serial.print(ppm_channels[2]);
+    Serial.print("\tCh 4:\t");
+    Serial.print(ppm_channels[3]);
+    Serial.println();
+}
 void readIMU(){
     IMU.readSensor();
 }

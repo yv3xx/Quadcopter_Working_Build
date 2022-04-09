@@ -22,9 +22,7 @@ static const char cmp4[4]="pid";
 
 int status;
 
-//ppm stuff
-float ppm_channels[6];
-PulsePositionInput myInput;
+
 
 
 // fusion
@@ -50,7 +48,8 @@ void slowLoopTask(void* parameters){
       Serial.print("Error in read: ");
       Serial.println(result);
     }
-  
+  readPPM();
+  printPPM();
   stop=micros();
   #ifdef DEBUG
     Serial.print("T:\t");
@@ -69,10 +68,11 @@ void slowLoopTask(void* parameters){
 void fastLoopTask(void* parameters){
   while(1){
   start1=micros();
-  readPPM(ppm_channels,myInput);
+  //readPPM(ppm_channels,myInput);
   readIMU();
   calcIMU(&roll,&pitch,&yaw);
  // printAtt(roll,pitch,yaw);
+ // writeMotors();
   
   stop1=micros();
   #ifdef DEBUG
@@ -111,6 +111,9 @@ void fastLoopTask(void* parameters){
   }
 }
 void setupTask(void* parameters){
+
+  
+
   if (MS5611.begin() == true)
   {
     Serial.println("MS5611 found.");
@@ -130,19 +133,23 @@ void setupTask(void* parameters){
     Serial.print("Error in read: ");
     Serial.println(result);
   }
-
+  Serial.println("Initializing PPM");
+  initPPM();
   initIMU();
+  
   xTimerStart(settlingTimer,0);
   Serial.println("Starting Timer");
   while(xTimerIsTimerActive(settlingTimer)!= pdFALSE){
     readIMU();
     calcIMU(&roll,&pitch,&yaw);
-    printAtt(roll,pitch,yaw);
+    //printAtt(roll,pitch,yaw);
   }
 
   Serial.println("Hopefully the values will be the same after this!");
   xTimerDelete(settlingTimer,portMAX_DELAY);
   Serial.println("HOPEFULLY THE VLAUES WILL BE THE SAME!!");
+  
+  initMotors();
   vTaskDelete(NULL);
 }
 
@@ -191,8 +198,6 @@ void setup() {
 
   Serial.println("Poop Hi serial is done");
 
-  
-  initPPM(myInput);
   settlingTimer=xTimerCreate("fusionWindup",23000/portTICK_RATE_MS,0,settlingTimer,vTimerCallback);
   mutex=xSemaphoreCreateMutex();
   xTaskCreate(setupTask, "Setup",1000,NULL,3,NULL);

@@ -1,5 +1,5 @@
 #include "sensor.h"
-
+#define DEBUG
 
 float gx, gy, gz, ax, ay, az, mx, my, mz, temp;
 float deltat;
@@ -12,6 +12,61 @@ MPU9250 IMU(SPI,10);
 float ppm_channels[6];
 PPM myPPM;
 
+
+// motor control things
+int16_t RCrate=2;
+
+
+// motors
+
+
+//ppm channels:   channel 3 is throttle
+// channel 4 is yaw
+//channel 1 is roll
+//channrl 2 is pitch
+extern float throttleCorrection;
+float rollError=0;
+float pitchError=0; 
+float yawError=0;
+const float maxAngle=45;
+float halfRange=500;
+
+float throttleCommand=0;
+
+const float yawRateSmooth =0.01f;
+float prevYawRate=0;
+
+float circleDiff(float prevYaw,float yaw);
+
+void calculateErrors(float roll, float pitch, float yaw, float prevYaw){
+    rollError=((float) roll - (maxAngle * RCrate * ((float)((int16_t)ppm_channels[0] - (int16_t)MIDRC) / halfRange))) / 90.0f;
+    
+    pitchError=((float) pitch - (maxAngle * RCrate * ((float)((int16_t)ppm_channels[1] - (int16_t)MIDRC) / halfRange))) / 90.0f;
+    
+
+    float yawRate=circleDiff(prevYaw,yaw)/.002;
+    yawRate=(yawRateSmooth * yawRate) + ((1.0f -yawRateSmooth)*prevYawRate);
+    prevYawRate=yawRate;
+
+    yawError=((float) yawRate - (maxAngle * RCrate * ((float)((int16_t)ppm_channels[3] - (int16_t)MIDRC) / halfRange))) / 90.0f;
+    #ifdef DEBUG
+        Serial.print("Yaw is:");
+        Serial.println(yaw);
+        Serial.print("prevYaw is:");
+        Serial.println(prevYaw);
+        Serial.print("circlediff is:");
+        Serial.println(circleDiff(prevYaw,yaw));
+        Serial.print("yawRate is:");
+        Serial.println(yawRate);
+        Serial.print("Roll error is:");
+        Serial.println(rollError);
+        Serial.print("Pitch error is:");
+        Serial.println(pitchError);
+        Serial.print("YawRate error is:");
+        Serial.println(yawError);
+    #endif
+    throttleCommand=ppm_channels[2];
+}
 
 void readPPM(){
     uint8_t i=0;
@@ -43,7 +98,7 @@ void readIMU(){
     IMU.readSensor();
 }
 
-void calcIMU(float* roll, float* pitch, float* yaw){
+void calcIMU(float* roll, float* pitch, float* yaw,float* prevYaw){
     ax = IMU.getAccelX_mss();
     ay = IMU.getAccelY_mss();
     az = IMU.getAccelZ_mss();
@@ -65,6 +120,7 @@ void calcIMU(float* roll, float* pitch, float* yaw){
   }
   else *roll+=180;
   *pitch = fusion.getPitch();
+  *prevYaw=*yaw;
   *yaw = fusion.getYaw();
 }
 
@@ -155,4 +211,17 @@ void initIMU(){
     
     Serial.println("IMU intialization successful");
 
+}
+
+float circleDiff(float prevYaw,float yaw){
+    float diff=0;
+    if((prevYaw >315) && (yaw<45)){
+        diff= yaw + (360-prevYaw);
+    }
+    else if((yaw>315) && (prevYaw<45)){
+        diff=(prevYaw + (360-yaw))*-1;
+    } else {
+        diff= yaw - prevYaw;
+    }
+    return(diff);
 }

@@ -28,6 +28,7 @@ int status;
 // fusion
 
 float pitch, roll, yaw;
+float prevYaw=0;
 
 // timer handle for roll pitch yaw settling
 TimerHandle_t settlingTimer;
@@ -48,8 +49,13 @@ void slowLoopTask(void* parameters){
       Serial.print("Error in read: ");
       Serial.println(result);
     }
+
   readPPM();
   printPPM();
+  readIMU();
+  calcIMU(&roll,&pitch,&yaw,&prevYaw);
+  printAtt(roll,pitch,yaw);
+  calculateErrors(roll,pitch,yaw,prevYaw);
   stop=micros();
   #ifdef DEBUG
     Serial.print("T:\t");
@@ -68,10 +74,14 @@ void slowLoopTask(void* parameters){
 void fastLoopTask(void* parameters){
   while(1){
   start1=micros();
-  //readPPM(ppm_channels,myInput);
+  /*
+  readPPM();
+  printPPM();
   readIMU();
   calcIMU(&roll,&pitch,&yaw);
- // printAtt(roll,pitch,yaw);
+  printAtt(roll,pitch,yaw);*/
+ // calculateErrors(roll,pitch,yaw);
+ 
  // writeMotors();
   
   stop1=micros();
@@ -141,7 +151,7 @@ void setupTask(void* parameters){
   Serial.println("Starting Timer");
   while(xTimerIsTimerActive(settlingTimer)!= pdFALSE){
     readIMU();
-    calcIMU(&roll,&pitch,&yaw);
+    calcIMU(&roll,&pitch,&yaw,&prevYaw);
     //printAtt(roll,pitch,yaw);
   }
 

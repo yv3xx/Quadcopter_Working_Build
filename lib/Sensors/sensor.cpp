@@ -1,5 +1,5 @@
 #include "sensor.h"
-#define DEBUG
+//#define DEBUG
 
 float gx, gy, gz, ax, ay, az, mx, my, mz, temp;
 float deltat;
@@ -24,7 +24,6 @@ int16_t RCrate=2;
 // channel 4 is yaw
 //channel 1 is roll
 //channrl 2 is pitch
-extern float throttleCorrection;
 float rollError=0;
 float pitchError=0; 
 float yawError=0;
@@ -65,7 +64,7 @@ void calculateErrors(float roll, float pitch, float yaw, float prevYaw){
         Serial.print("YawRate error is:");
         Serial.println(yawError);
     #endif
-    throttleCommand=ppm_channels[2];
+    throttleCommand=ppm_channels[2]-MINRC;
 }
 
 void readPPM(){

@@ -50,12 +50,7 @@ void slowLoopTask(void* parameters){
       Serial.println(result);
     }
 
-  readPPM();
-  printPPM();
-  readIMU();
-  calcIMU(&roll,&pitch,&yaw,&prevYaw);
-  printAtt(roll,pitch,yaw);
-  calculateErrors(roll,pitch,yaw,prevYaw);
+  
   stop=micros();
   #ifdef DEBUG
     Serial.print("T:\t");
@@ -74,15 +69,15 @@ void slowLoopTask(void* parameters){
 void fastLoopTask(void* parameters){
   while(1){
   start1=micros();
-  /*
   readPPM();
-  printPPM();
+  //printPPM();
   readIMU();
-  calcIMU(&roll,&pitch,&yaw);
-  printAtt(roll,pitch,yaw);*/
- // calculateErrors(roll,pitch,yaw);
- 
- // writeMotors();
+  calcIMU(&roll,&pitch,&yaw,&prevYaw);
+  //printAtt(roll,pitch,yaw);
+  calculateErrors(roll,pitch,yaw,prevYaw);
+  doPID();
+  doMix();
+  writeMotors();
   
   stop1=micros();
   #ifdef DEBUG
@@ -126,11 +121,11 @@ void setupTask(void* parameters){
 
   if (MS5611.begin() == true)
   {
-    Serial.println("MS5611 found.");
+    HWSERIAL.println("MS5611 found.");
   }
   else
   {
-    Serial.println("MS5611 not found. halt.");
+    HWSERIAL.println("MS5611 not found. halt.");
     while (1);
   }
 
@@ -140,25 +135,25 @@ void setupTask(void* parameters){
   int result = MS5611.read();
   if (result != MS5611_READ_OK)
   {
-    Serial.print("Error in read: ");
-    Serial.println(result);
+    HWSERIAL.print("Error in read: ");
+    HWSERIAL.println(result);
   }
-  Serial.println("Initializing PPM");
+  HWSERIAL.println("Initializing PPM");
   initPPM();
   initIMU();
   
   xTimerStart(settlingTimer,0);
-  Serial.println("Starting Timer");
+  HWSERIAL.println("Starting Timer");
   while(xTimerIsTimerActive(settlingTimer)!= pdFALSE){
     readIMU();
     calcIMU(&roll,&pitch,&yaw,&prevYaw);
     //printAtt(roll,pitch,yaw);
   }
 
-  Serial.println("Hopefully the values will be the same after this!");
+  HWSERIAL.println("Hopefully the values will be the same after this!");
   xTimerDelete(settlingTimer,portMAX_DELAY);
-  Serial.println("HOPEFULLY THE VLAUES WILL BE THE SAME!!");
-  
+  HWSERIAL.println("HOPEFULLY THE VLAUES WILL BE THE SAME!!");
+  HWSERIAL.println("Setup is done commence flight test!");
   initMotors();
   vTaskDelete(NULL);
 }
@@ -206,7 +201,7 @@ void setup() {
   Serial.begin(115200);
   HWSERIAL.begin(115200);
 
-  Serial.println("Poop Hi serial is done");
+  HWSERIAL.println("Poop Hi serial is done");
 
   settlingTimer=xTimerCreate("fusionWindup",23000/portTICK_RATE_MS,0,settlingTimer,vTimerCallback);
   mutex=xSemaphoreCreateMutex();

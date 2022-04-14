@@ -8,5 +8,8 @@
 //channel 1 is roll
 //channrl 2 is pitch
 
+
+
 void writeMotors();
 void initMotors();
+void doMix();

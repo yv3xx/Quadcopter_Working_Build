@@ -14,7 +14,8 @@ PPM myPPM;
 
 
 // motor control things
-int16_t RCrate=2;
+int16_t RCrate=1.5;
+int16_t RCrateyaw=3;
 
 
 // motors
@@ -29,6 +30,8 @@ float pitchError=0;
 float yawError=0;
 const float maxAngle=45;
 float halfRange=500;
+float rollDiff=0;
+float pitchDiff=0;
 
 float throttleCommand=0;
 
@@ -38,16 +41,17 @@ float prevYawRate=0;
 float circleDiff(float prevYaw,float yaw);
 
 void calculateErrors(float roll, float pitch, float yaw, float prevYaw){
-    rollError=((float) roll - (maxAngle * RCrate * ((float)((int16_t)ppm_channels[0] - (int16_t)MIDRC) / halfRange))) / 90.0f;
+    rollError=((float) roll - (-1* maxAngle * RCrate * ((float)((int16_t)ppm_channels[0] - (int16_t)MIDRC) / halfRange))) / 90.0f;
+    //rollError*=-1;
     
     pitchError=((float) pitch - (maxAngle * RCrate * ((float)((int16_t)ppm_channels[1] - (int16_t)MIDRC) / halfRange))) / 90.0f;
     
 
-    float yawRate=circleDiff(prevYaw,yaw)/.002;
+    float yawRate=circleDiff(prevYaw,yaw)/deltat;
     yawRate=(yawRateSmooth * yawRate) + ((1.0f -yawRateSmooth)*prevYawRate);
     prevYawRate=yawRate;
 
-    yawError=((float) yawRate - (maxAngle * RCrate * ((float)((int16_t)ppm_channels[3] - (int16_t)MIDRC) / halfRange))) / 90.0f;
+    yawError=((float) yawRate - (-1* maxAngle * RCrateyaw * ((float)((int16_t)ppm_channels[3] - (int16_t)MIDRC) / halfRange))) / 90.0f;
     #ifdef DEBUG
         Serial.print("Yaw is:");
         Serial.println(yaw);
@@ -110,15 +114,17 @@ void calcIMU(float* roll, float* pitch, float* yaw,float* prevYaw){
     temp = IMU.getTemperature_C();
 
     deltat = fusion.deltatUpdate();
- // fusion.MahonyUpdate(gx, gy, gz, ax, ay, az, deltat);  //mahony is suggested if there isn't the mag
-  fusion.MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, deltat);  //else use the magwick
+    fusion.MahonyUpdate(gx, gy, gz, ax, ay, az, deltat);  //mahony is suggested if there isn't the mag
+  //fusion.MadgwickUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, deltat);  //else use the magwick
 
-  *roll = fusion.getRoll();
-  if(*roll>0){
-      *roll-=180;
+  *roll = fusion.getPitch();
+  *pitch = fusion.getRoll();
+  *roll+=rollDiff;
+  if(*pitch>0){
+      *pitch-=180;
   }
-  else *roll+=180;
-  *pitch = fusion.getPitch();
+  else *pitch+=180;
+  *pitch+=pitchDiff;
   *prevYaw=*yaw;
   *yaw = fusion.getYaw();
 }
@@ -134,63 +140,75 @@ void printAtt(float roll, float pitch, float yaw){
 }
 
 void calIMU(){
-
-  Serial.println("Beginning gyroscope calibration");
+  Serial1.println("Beginning gyroscope calibration");
   status2=IMU.calibrateGyro();
-  Serial.print("Status after calibration:");
-  Serial.print(status2);
-  Serial.print("Biases are: ");
-  Serial.print(IMU.getGyroBiasX_rads());
-  Serial.print("\t");
-  Serial.print(IMU.getGyroBiasY_rads());
-  Serial.print("\t");
-  Serial.print(IMU.getGyroBiasZ_rads());
-  Serial.print("\t");
-  Serial.print("\n\n");
-
+  Serial1.print("Status after calibration:");
+  Serial1.print(status2);
+  Serial1.print("Biases are: ");
+  Serial1.print(IMU.getGyroBiasX_rads());
+  Serial1.print("\t");
+  Serial1.print(IMU.getGyroBiasY_rads());
+  Serial1.print("\t");
+  Serial1.print(IMU.getGyroBiasZ_rads());
+  Serial1.print("\t");
+  Serial1.print("\n\n");
+  IMU.setGyroBiasX_rads(IMU.getGyroBiasX_rads());
+  IMU.setGyroBiasX_rads(IMU.getGyroBiasY_rads());
+  IMU.setGyroBiasX_rads(IMU.getGyroBiasZ_rads());
   
   delay_NoSysTick(2000);
-  Serial.println("Beginning accelerometer calibration");
+  Serial1.println("Beginning accelerometer calibration");
   status2=IMU.calibrateAccel();
-  Serial.print("Status after calibration:");
-  Serial.print(status2);
-  Serial.print("Biases are: ");
-  Serial.print(IMU.getAccelBiasX_mss());
-  Serial.print("\t");
-  Serial.print(IMU.getAccelBiasY_mss());
-  Serial.print("\t");
-  Serial.print(IMU.getAccelBiasZ_mss());
-  Serial.print("\t\n");
-  Serial.print("Scale Factors are: ");
-  Serial.print(IMU.getAccelScaleFactorX());
-  Serial.print("\t");
-  Serial.print(IMU.getAccelScaleFactorY());
-  Serial.print("\t");
-  Serial.print(IMU.getAccelScaleFactorZ());
-  Serial.print("\n\n");
+  Serial1.print("Status after calibration:");
+  Serial1.print(status2);
+  Serial1.print("Biases are: ");
+  Serial1.print(IMU.getAccelBiasX_mss());
+  Serial1.print("\t");
+  Serial1.print(IMU.getAccelBiasY_mss());
+  Serial1.print("\t");
+  Serial1.print(IMU.getAccelBiasZ_mss());
+  Serial1.print("\t\n");
+  Serial1.print("Scale Factors are: ");
+  Serial1.print(IMU.getAccelScaleFactorX());
+  Serial1.print("\t");
+  Serial1.print(IMU.getAccelScaleFactorY());
+  Serial1.print("\t");
+  Serial1.print(IMU.getAccelScaleFactorZ());
+  Serial1.print("\n\n");
   
+  IMU.setAccelCalX(IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactorX());
+  IMU.setAccelCalY(IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactorY());
+  IMU.setAccelCalZ(IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactorZ());
+  
+    /*
   delay_NoSysTick(2000);
-  Serial.println("Beginning magnetometer calibration");
+  Serial1.println("Beginning magnetometer calibration");
   status2=IMU.calibrateMag();
-  Serial.print("Status after calibration:");
-  Serial.print(status2);
-  Serial.print("Biases are: ");
-  Serial.print(IMU.getMagBiasX_uT());
-  Serial.print("\t");
-  Serial.print(IMU.getMagBiasY_uT());
-  Serial.print("\t");
-  Serial.print(IMU.getMagBiasZ_uT());
-  Serial.print("\t\n");
-  Serial.print("Scale Factors are: ");
-  Serial.print(IMU.getMagScaleFactorX());
-  Serial.print("\t");
-  Serial.print(IMU.getMagScaleFactorY());
-  Serial.print("\t");
-  Serial.print(IMU.getMagScaleFactorZ());
-  Serial.print("\n\n");
- 
+  Serial1.print("Status after calibration:");
+  Serial1.print(status2);
+  Serial1.print("Biases are: ");
+  Serial1.print(IMU.getMagBiasX_uT());
+  Serial1.print("\t");
+  Serial1.print(IMU.getMagBiasY_uT());
+  Serial1.print("\t");
+  Serial1.print(IMU.getMagBiasZ_uT());
+  Serial1.print("\t\n");
+  Serial1.print("Scale Factors are: ");
+  Serial1.print(IMU.getMagScaleFactorX());
+  Serial1.print("\t");
+  Serial1.print(IMU.getMagScaleFactorY());
+  Serial1.print("\t");
+  Serial1.print(IMU.getMagScaleFactorZ());
+  Serial1.print("\n\n");
+  IMU.setMagCalX(IMU.getMagBiasX_uT(),IMU.getMagScaleFactorX());
+  IMU.setMagCalY(IMU.getMagBiasY_uT(),IMU.getMagScaleFactorY());
+  IMU.setMagCalZ(IMU.getMagBiasZ_uT(),IMU.getMagScaleFactorZ());
+  */
 }
-
+void calcDiff(float roll, float pitch){
+    rollDiff=0-roll;
+    pitchDiff=0-pitch;
+}
 void initIMU(){
     status2 = IMU.begin();
     if (status2 < 0) {
@@ -200,13 +218,6 @@ void initIMU(){
         Serial.println(status2);
         while(1) {}
     }
-    IMU.setGyroBiasX_rads(-.02f);
-    IMU.setGyroBiasY_rads(0.0f);
-    IMU.setGyroBiasZ_rads(.02f);
-
-    IMU.setMagCalX(14.89f,1.136f);
-    IMU.setMagCalY(-11.466f,1.163f);
-    IMU.setMagCalZ(-69.6f,.81f);
     
     Serial.println("IMU intialization successful");
 
@@ -224,3 +235,7 @@ float circleDiff(float prevYaw,float yaw){
     }
     return(diff);
 }
+/*
+float calcAlt(float pressure){
+    float alt=0;
+}*/

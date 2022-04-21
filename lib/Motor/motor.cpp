@@ -45,7 +45,7 @@ void doMix(){
   Serial.print("throttlecorrection is:");
   Serial.println(throttleCorrection);
   #endif
-  if(axisCmdPID>0){
+  if(axisCmdPID[0]>0){
     for(int i=0;i<4;i++){
       motor[i]=motorCmd[i]+1000;
     }
@@ -61,7 +61,7 @@ void initMotors(){
   for(uint8_t i=0; i<4; i++){
     motor[i]=1000;
     pinMode(PWM_PIN[i],OUTPUT);
-   // analogWriteFrequency(PWM_PIN[i],16000);
+    analogWriteFrequency(PWM_PIN[i],8000);
   }
   writeMotors();
 }

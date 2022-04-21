@@ -22,7 +22,16 @@ static const char cmp4[4]="pid";
 
 int status;
 
-
+// state declarations for bluetooth task
+enum state{
+  wait,
+  att,
+  bat,
+  alt,
+  pid,
+  pidType,
+  pidNum
+};
 
 
 // fusion
@@ -35,6 +44,8 @@ TimerHandle_t settlingTimer;
 
 
 SemaphoreHandle_t mutex;
+
+volatile enum state currState;
 
 void vTimerCallback(TimerHandle_t xTimer){
 }
@@ -142,6 +153,7 @@ void setupTask(void* parameters){
   initPPM();
   initIMU();
   
+  calIMU();
   xTimerStart(settlingTimer,0);
   HWSERIAL.println("Starting Timer");
   while(xTimerIsTimerActive(settlingTimer)!= pdFALSE){
@@ -149,7 +161,9 @@ void setupTask(void* parameters){
     calcIMU(&roll,&pitch,&yaw,&prevYaw);
     //printAtt(roll,pitch,yaw);
   }
-
+  readIMU();
+  calcIMU(&roll,&pitch,&yaw,&prevYaw);
+  calcDiff(roll,pitch);
   HWSERIAL.println("Hopefully the values will be the same after this!");
   xTimerDelete(settlingTimer,portMAX_DELAY);
   HWSERIAL.println("HOPEFULLY THE VLAUES WILL BE THE SAME!!");
@@ -162,34 +176,133 @@ void btTask(void* parameters){
   char input;
   char buf[4];
   uint8_t i=0;
+  uint8_t mode=10;
+  uint8_t param=10;
+  float value=0;
   while(1){
-    if(HWSERIAL.available()){
-      input=HWSERIAL.read();
-      if(i==3){
-        if(strncmp(buf,cmp,3)==0){
-          Serial.println("attitude command received");
+    switch(currState){
+      case(wait):
+        if(HWSERIAL.available()){
+        input=HWSERIAL.read();
+        if(i==3){
+          if(strncmp(buf,cmp,3)==0){
+            currState=att;
+          }
+          else if(strncmp(buf,cmp2,3)==0){
+            currState=alt;
+          }
+          else if(strncmp(buf,cmp3,3)==0){
+            currState=bat;
+          }
+          else if(strncmp(buf,cmp4,3)==0){
+            HWSERIAL.println("PID command received");
+            HWSERIAL.println("Would you like to adjust throttle[1] roll[2] pitch[3] or yaw[4]?");
+            currState=pid;
+          }
+            memset(buf,0,4);
+            i=0;
         }
-        else if(strncmp(buf,cmp2,3)==0){
-          Serial.println("altitude command received");
-        }
-        else if(strncmp(buf,cmp3,3)==0){
-          Serial.println("battery command received");
-        }
-        else if(strncmp(buf,cmp4,3)==0){
-          Serial.println("pid command received");
-        }
+        buf[i]=input;
+        i++;
+        if(input== '\n'){
           memset(buf,0,4);
           i=0;
+        }
+        }
+      break;
+      case(att):
+        HWSERIAL.println("Attitude command received");
+        HWSERIAL.print("Attitude is: Roll:");
+        HWSERIAL.print(roll);
+        HWSERIAL.print(" Pitch:");
+        HWSERIAL.print(pitch);
+        HWSERIAL.print(" Yaw:");
+        HWSERIAL.println(yaw);
+        currState=wait;
+      break;
+      case(bat):
+        HWSERIAL.println("Battery command received");
+      break;
+      case(alt):
+        HWSERIAL.println("Altitude command received");
+      break;
+      case(pid):
+        if(HWSERIAL.available()){
+          input=HWSERIAL.read();
+          switch(input){
+            case('1'):
+            mode=0;
+            HWSERIAL.println("Would you like to adjust P[1] I[2] or D[3]?");
+            HWSERIAL.read();
+            currState=pidType;
+            break;
+            case('2'):
+            mode=1;
+            HWSERIAL.println("Would you like to adjust P[1] I[2] or D[3]?");
+            HWSERIAL.read();
+            currState=pidType;
+            break;
+            case('3'):
+            mode=2;
+            HWSERIAL.println("Would you like to adjust P[1] I[2] or D[3]?");
+            HWSERIAL.read();
+            currState=pidType;
+            break;
+            case('4'):
+            mode=3;
+            HWSERIAL.println("Would you like to adjust P[1] I[2] or D[3]?");
+            HWSERIAL.read();
+            currState=pidType;
+            break;
+            default:
+            HWSERIAL.println("Not a valid choice!");
+            break;
+          }
+        }
+      break;
+      case(pidType):
+        if(HWSERIAL.available()){
+          input=HWSERIAL.read();
+          switch(input){
+            case('1'):
+            param=1;
+            HWSERIAL.println("Input the value:");
+            HWSERIAL.read();
+            currState=pidNum;
+            break;
+            case('2'):
+            param=2;
+            HWSERIAL.println("Input the value:");
+            HWSERIAL.read();
+            currState=pidNum;
+            break;
+            case('3'):
+            param=3;
+            HWSERIAL.println("Input the value:");
+            HWSERIAL.read();
+            currState=pidNum;
+            break;
+            default:
+            HWSERIAL.println("Not a valid choice!");
+            break;
+          }
+        }
+      break;
+      case(pidNum):
+      if(HWSERIAL.available()){
+        value=HWSERIAL.parseFloat();
+        HWSERIAL.print("Updating mode:");
+        HWSERIAL.print(mode);
+        HWSERIAL.print(" and parameter:");
+        HWSERIAL.print(param);
+        HWSERIAL.print("with value:");
+        HWSERIAL.println(value);
+        changePID(mode,param,value);
+        currState=wait;
       }
-      buf[i]=input;
-      i++;
-      if(input== '\n'){
-        memset(buf,0,4);
-        i=0;
-      }
-      Serial.print(input);
-      
+      break;
     }
+    
     if(Serial.available()){
       input=Serial.read();
       Serial.print(input);
@@ -203,12 +316,12 @@ void setup() {
 
   HWSERIAL.println("Poop Hi serial is done");
 
-  settlingTimer=xTimerCreate("fusionWindup",23000/portTICK_RATE_MS,0,settlingTimer,vTimerCallback);
+  settlingTimer=xTimerCreate("fusionWindup",25000/portTICK_RATE_MS,0,settlingTimer,vTimerCallback);
   mutex=xSemaphoreCreateMutex();
   xTaskCreate(setupTask, "Setup",1000,NULL,3,NULL);
   xTaskCreate(slowLoopTask,"slowLoop",1000,NULL,1,NULL);
   xTaskCreate(fastLoopTask,"fastLoop",1000,NULL,2,NULL);
-  xTaskCreate(btTask,"bluetooth",250,NULL,1,NULL);
+  xTaskCreate(btTask,"bluetooth",400,NULL,1,NULL);
   vTaskStartScheduler();
   vTaskDelete(NULL);
 }

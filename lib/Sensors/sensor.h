@@ -27,3 +27,4 @@ void printAtt(float roll, float pitch, float yaw);
 void calIMU();
 void initIMU();
 void calculateErrors(float roll, float pitch, float yaw, float prevYaw);
+void calcDiff(float roll, float pitch);

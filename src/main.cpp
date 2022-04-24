@@ -81,7 +81,7 @@ void fastLoopTask(void* parameters){
   while(1){
   start1=micros();
   readPPM();
-  //printPPM();
+  printPPM();
   readIMU();
   calcIMU(&roll,&pitch,&yaw,&prevYaw);
   //printAtt(roll,pitch,yaw);

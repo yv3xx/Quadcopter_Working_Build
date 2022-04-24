@@ -73,11 +73,20 @@ void calculateErrors(float roll, float pitch, float yaw, float prevYaw){
 
 void readPPM(){
     uint8_t i=0;
-    for(i=1;i<=4; i++){
-        ppm_channels[i-1]=myPPM.dataRead(PPMPIN,i);
-        ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
-        if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
-    }
+   // if(myPPM.dataAvl(PPMPIN)){
+        for(i=1;i<=4; i++){
+            ppm_channels[i-1]=myPPM.dataRead(PPMPIN,i);
+            ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
+            if(i!=2){
+                if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
+            }
+        }
+   // } else{
+   //     ppm_channels[2]-= 5;
+     //   if (ppm_channels[2]<1000){
+       //     ppm_channels[2]=1000;
+    //    }
+   // }
 }
 
 void initPPM(){

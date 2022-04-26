@@ -1,7 +1,12 @@
 #include "sensor.h"
 //#define DEBUG
 
-float gx, gy, gz, ax, ay, az, mx, my, mz, temp;
+
+// barometer +temp
+MS5611 MS5611(0x77);
+
+
+float gx, gy, gz, ax, ay, az, mx, my, mz;
 float deltat;
 int status2; 
 SF fusion;
@@ -30,13 +35,24 @@ float pitchError=0;
 float yawError=0;
 const float maxAngle=45;
 float halfRange=500;
-float rollDiff=0;
-float pitchDiff=0;
+float rollDiff=-4.5;
+float pitchDiff=0.3;
 
 float throttleCommand=0;
 
 const float yawRateSmooth =0.01f;
 float prevYawRate=0;
+
+// altitude stuff
+float pressureAtGround=0;
+const float Pb=1014.5;
+const float C=5.257;
+const float kelvinForm=273.15; 
+const float R=0.0065;
+float groundHeight=0;
+float temp=0;
+//float height;
+bool failsafe=false;
 
 float circleDiff(float prevYaw,float yaw);
 
@@ -72,8 +88,9 @@ void calculateErrors(float roll, float pitch, float yaw, float prevYaw){
 }
 
 void readPPM(){
+    float inData=0;
     uint8_t i=0;
-   // if(myPPM.dataAvl(PPMPIN)){
+    if(!failsafe){
         for(i=1;i<=4; i++){
             ppm_channels[i-1]=myPPM.dataRead(PPMPIN,i);
             ppm_channels[i-1]=constrain(ppm_channels[i-1],MINRC,MAXRC);
@@ -81,12 +98,15 @@ void readPPM(){
                 if((ppm_channels[i-1] > DEADBOT) && (ppm_channels[i-1] < DEADTOP)) ppm_channels[i-1]=MIDRC;
             }
         }
-   // } else{
-   //     ppm_channels[2]-= 5;
-     //   if (ppm_channels[2]<1000){
-       //     ppm_channels[2]=1000;
-    //    }
-   // }
+    } else{
+        ppm_channels[2]-= 0.5;
+        if (ppm_channels[2]<1020){
+            ppm_channels[2]=1000;
+        }
+        ppm_channels[0]=1500;
+        ppm_channels[1]=1500;
+        ppm_channels[3]=1500;
+    }
 }
 
 void initPPM(){
@@ -120,7 +140,6 @@ void calcIMU(float* roll, float* pitch, float* yaw,float* prevYaw){
     mx = IMU.getMagX_uT();
     my = IMU.getMagY_uT();
     mz = IMU.getMagZ_uT();
-    temp = IMU.getTemperature_C();
 
     deltat = fusion.deltatUpdate();
     fusion.MahonyUpdate(gx, gy, gz, ax, ay, az, deltat);  //mahony is suggested if there isn't the mag
@@ -244,7 +263,39 @@ float circleDiff(float prevYaw,float yaw){
     }
     return(diff);
 }
-/*
-float calcAlt(float pressure){
+
+float calcAlt(){
     float alt=0;
-}*/
+    float pressure=0;
+    MS5611.read();
+    pressure=MS5611.getPressure();
+    temp=MS5611.getTemperature();
+    alt=(pow((Pb/pressure),(1/C))-1)*((temp+kelvinForm)/R);
+    alt-=groundHeight;
+    if(alt>3.5) failsafe=true;
+    else if(alt<0.2)failsafe=false;
+    return(alt);
+}
+
+void initAlt(){
+    if (MS5611.begin() == true)
+  {
+    Serial1.println("MS5611 found.");
+  }
+  else
+  {
+    Serial1.println("MS5611 not found. halt.");
+    while (1);
+  }
+    MS5611.setOversampling(OSR_HIGH);
+    int result = MS5611.read();
+    if (result != MS5611_READ_OK) {
+        Serial1.print("Error in read: ");
+        Serial1.println(result);
+    }
+    pressureAtGround=MS5611.getPressure();
+    temp=MS5611.getTemperature();
+}
+void calcInitHeight(){
+    groundHeight=(pow((Pb/pressureAtGround),(1/C))-1)*((temp+kelvinForm)/R);
+}

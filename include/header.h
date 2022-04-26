@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include "spi4teensy3.h"
-#include "MS5611.h"
 #include <FreeRTOS.h>
 #include "queue.h"
 #include <task.h>

@@ -6,8 +6,7 @@
 
 uint32_t start,stop,start1,stop1;
 
-// barometer +temp
-MS5611 MS5611(0x77);
+
 
 // bluetooth
 #define HWSERIAL Serial1
@@ -42,6 +41,8 @@ float prevYaw=0;
 // timer handle for roll pitch yaw settling
 TimerHandle_t settlingTimer;
 
+// alt
+float altitude=0;
 
 SemaphoreHandle_t mutex;
 
@@ -53,15 +54,8 @@ void vTimerCallback(TimerHandle_t xTimer){
 void slowLoopTask(void* parameters){
   while(1){
   start=micros();
-  
-  int result = MS5611.read();
-  if (result != MS5611_READ_OK)
-    {
-      Serial.print("Error in read: ");
-      Serial.println(result);
-    }
+  altitude=calcAlt();
 
-  
   stop=micros();
   #ifdef DEBUG
     Serial.print("T:\t");
@@ -127,28 +121,8 @@ void fastLoopTask(void* parameters){
   }
 }
 void setupTask(void* parameters){
-
-  
-
-  if (MS5611.begin() == true)
-  {
-    HWSERIAL.println("MS5611 found.");
-  }
-  else
-  {
-    HWSERIAL.println("MS5611 not found. halt.");
-    while (1);
-  }
-
-
-  
-  MS5611.setOversampling(OSR_STANDARD);
-  int result = MS5611.read();
-  if (result != MS5611_READ_OK)
-  {
-    HWSERIAL.print("Error in read: ");
-    HWSERIAL.println(result);
-  }
+  initAlt();
+  calcInitHeight();
   HWSERIAL.println("Initializing PPM");
   initPPM();
   initIMU();
@@ -159,11 +133,11 @@ void setupTask(void* parameters){
   while(xTimerIsTimerActive(settlingTimer)!= pdFALSE){
     readIMU();
     calcIMU(&roll,&pitch,&yaw,&prevYaw);
-    //printAtt(roll,pitch,yaw);
+    printAtt(roll,pitch,yaw);
   }
   readIMU();
   calcIMU(&roll,&pitch,&yaw,&prevYaw);
-  calcDiff(roll,pitch);
+  //calcDiff(roll,pitch);
   HWSERIAL.println("Hopefully the values will be the same after this!");
   xTimerDelete(settlingTimer,portMAX_DELAY);
   HWSERIAL.println("HOPEFULLY THE VLAUES WILL BE THE SAME!!");
@@ -225,6 +199,10 @@ void btTask(void* parameters){
       break;
       case(alt):
         HWSERIAL.println("Altitude command received");
+        HWSERIAL.println("Altitude is: ");
+        HWSERIAL.print(altitude);
+        HWSERIAL.println(" (m)");
+        currState=wait;
       break;
       case(pid):
         if(HWSERIAL.available()){
